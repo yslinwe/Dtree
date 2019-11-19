@@ -17,17 +17,14 @@ import sys
 b = Bilibili()
 videolist = []
 new_videos = []
-description_names = ""
 title = ''
-anchor = ''
-Roomid = ''
 flag_upload = False
 #获取文件的大小,结果保留两位小数，单位为MB'''
 def get_FileSize(filePath):
     fsize = os.path.getsize(filePath)
     fsize = fsize/float(1024*1024)
     return round(fsize,2)
-def popen(cmd,roomid,achorname):
+def popen(cmd,roomid,achorname,targeturl,platform):
     flag_getdanmu = True
     file_part =''
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1)
@@ -46,7 +43,15 @@ def popen(cmd,roomid,achorname):
                 flag_upload = False
             else: 
                 flag_upload = True
-        '''
+                if platform=='huya':
+                    description_names=huya_des(targeturl)
+                elif platform == 'douyu':
+                    description_names=douyu_des(targeturl)
+                p.stdout.close()
+                p.wait()   
+                return description_names
+
+        '''     
                 if flag_getdanmu:
                     cmd1 = 'node ./huyaDanmu-master/huya.js '+roomid+' ./danmu wanzi'
                     p1 = subprocess.Popen(cmd1)
@@ -55,8 +60,6 @@ def popen(cmd,roomid,achorname):
             if match1[0].strip() == "下载停止" and not flag_getdanmu:
                 p1.kill()
         '''
-    p.stdout.close()
-    p.wait()
 
 def huya_des(target):
     req = requests.get(url = target)
@@ -72,24 +75,14 @@ def douyu_des(target):
     texts = bf.find_all('div',class_="Title-headline")
     return texts[0].text
 
-def cutvideo(target,achorname,platform):
+def cutvideo(achorname,roomid,platform,description_names):
 
-    global description_names
-
-    if platform=='huya':
-        description_names=huya_des(target)
-    elif platform == 'douyu':
-        description_names=douyu_des(target)
     for f in os.listdir('./download'):
         if f.endswith('flv') and f[0:len(achorname)] == achorname:
             name = os.path.basename(f)
             MatchName = re.search(r"(\D.+)-(.+)\s(.+)\s(.+)\s(.+)-(.+)",name)
             global title
-            global Roomid
-            global anchor
-            title = MatchName.group(1)+'-'+MatchName.group(4).replace('-','.')+'.'+ MatchName.group(5).split('-')[0]+'-'+description_names
-            Roomid = MatchName.group(2)
-            anchor = MatchName.group(1)
+            title = achorname+'-'+MatchName.group(4).replace('-','.')+'.'+ MatchName.group(5).split('-')[0]+'-'+description_names
             break
     numID = 0
     for f in os.listdir('./download'):
@@ -161,7 +154,7 @@ def test_login(USERNAME,PASSWORD):
         print("登陆失败")
     else:print('登陆成功')
     
-def test_upload(achorname,targeturl):
+def test_upload(achorname,roomid,targeturl):
     flag = True
     flag_start = True
     allfilelist = []
@@ -188,8 +181,8 @@ def test_upload(achorname,targeturl):
         videolist.append(VideoPart(new_files))
     tid = 21
     tag = ['直播回放']
-    tag.append(anchor)
-    desc = '关注'+anchor+Roomid
+    tag.append(achorname)
+    desc = '关注'+achorname+roomid
     source = targeturl
     #cutlcr()
     b.upload(videolist, title, tid, tag, desc,source)
@@ -197,10 +190,10 @@ def test_upload(achorname,targeturl):
         new_files=os.path.join(path,new_file)
         os.remove(new_files)
     print('上传完成')
-def job(targeturl,achorname,platform,USERNAME,PASSWORD):
-    cutvideo(targeturl,achorname,platform)
+def job(targeturl,achorname,roomid,platform,description_names,USERNAME,PASSWORD):
+    cutvideo(achorname,roomid,platform,description_names)
     test_login(USERNAME,PASSWORD)
-    test_upload(achorname,targeturl)
+    test_upload(achorname,roomid,targeturl)
 
 def huya_message(targeturl):
     req = requests.get(url = targeturl)
@@ -223,8 +216,10 @@ def processs_task(targeturl,USERNAME,PASSWORD):
 
     platform = targeturl.split('.')[1]
     if platform == 'huya':
+        print(targeturl)
         achorname,roomid = huya_message(targeturl)
     elif platform == 'douyu':
+        print(targeturl)
         achorname,roomid = douyu_message(targeturl)
     path = './download/'+achorname
     isExists=os.path.exists(path)
@@ -233,7 +228,7 @@ def processs_task(targeturl,USERNAME,PASSWORD):
 
     while True:
         cmd = 'java -Dfile.encoding=utf-8 -jar BiliLiveRecorder.jar '+'"'+'debug=false&check=true&fileSize=1024&liver='+platform+'&qn=0&retry=0&id='+roomid+'"'
-        popen(cmd,roomid,achorname)
+        description_names=popen(cmd,roomid,achorname,targeturl,platform)
  
         flag_start = True
 
@@ -266,15 +261,17 @@ def processs_task(targeturl,USERNAME,PASSWORD):
             flag_start = False
 
         if flag_upload and flag_start:
-            p1 = mp.Process(target=job,args=(targeturl,achorname,platform,USERNAME,PASSWORD))
+            p1 = mp.Process(target=job,args=(targeturl,achorname,roomid,platform,description_names,USERNAME,PASSWORD))
             p1.start()
             flag_haved_start = True
         time.sleep(10)
 
 if __name__ == '__main__':
-  
+
     with open("config.yaml", "r") as yaml_file:
         yaml_obj = yaml.load(yaml_file.read(),Loader=yaml.FullLoader)
+    global USERNAME
+    global PASSWORD
     USERNAME = yaml_obj['USERNAME']
     PASSWORD = yaml_obj['PASSWORD']
     targeturl = yaml_obj['link']
