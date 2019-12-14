@@ -11,7 +11,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 
 # 10800 18000 4110
-chromedrive_path = 'chromedriver'
+chromedrive_path = './chromedriver'
 user_name = ''
 pass_word = ''
 
@@ -92,7 +92,8 @@ class Upload(object):
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument('--disable-gpu')
             chrome_options.add_argument('--disable-dev-shm-usage')
-            driver = webdriver.Chrome(executable_path=chromedrive_path, chrome_options=options)
+            chrome_options.add_argument("user-agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.81 Safari/537.36'")
+            driver = webdriver.Chrome(executable_path=chromedrive_path, chrome_options=chrome_options)
             # service_log_path=service_log_path)
             try:
 
@@ -128,7 +129,7 @@ class Upload(object):
                 if upload_success == '':
                     driver.save_screenshot('err.png')
                     print('稿件提交失败，截图记录')
-                    return
+                    
                 else:
                     print(upload_success)
                     self.remove_filelist(file_list)
@@ -269,4 +270,5 @@ def upload_test(achorname,url,title,USERNAME,PASSWORD):
     global pass_word
     user_name = USERNAME
     pass_word = PASSWORD
+    print(user_name,pass_word)
     Upload(achorname).start(url,title)

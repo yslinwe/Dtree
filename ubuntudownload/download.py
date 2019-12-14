@@ -80,14 +80,6 @@ def douyu_des(target):
     return texts[0].text
 
 def cutvideo(achorname,roomid,platform,description_names):
-
-    for f in os.listdir('./download'):
-        if f.endswith('flv') and f[0:len(achorname)] == achorname:
-            name = os.path.basename(f)
-            MatchName = re.search(r"(\D.+)-(.+)\s(.+)\s(.+)\s(.+)-(.+)",name)
-            global title
-            title = achorname+'-'+MatchName.group(4).replace('-','.')+'.'+ MatchName.group(5).split('-')[0]+'-'+description_names
-            break
     numID = 0
     path = os.getcwd()
     for f in os.listdir('./download'):
@@ -123,10 +115,16 @@ def cutlcr():
         shutil.move(filepath, newFilePath)  # 移动
     
 def job(targeturl,achorname,roomid,platform,description_names,USERNAME,PASSWORD):
-    try:
-        cutvideo(achorname,roomid,platform,description_names)
-        upload_test(achorname,targeturl,title,USERNAME,PASSWORD)
-    except:pass
+    cutvideo(achorname,roomid,platform,description_names)
+    for f in os.listdir('./'):
+        if f.endswith('flv') and f[0:len(achorname)] == achorname:
+	        name = os.path.basename(f)
+	        MatchName = re.search(r"(\D.+)-(.+)\s(.+)\s(.+)\s(.+)-(.+)",name)
+	        global title
+	        title = achorname+'-'+MatchName.group(4).replace('-','.')+'.'+ MatchName.group(5).split('-')[0]+'-'+description_names
+	        break
+    print(title)
+    upload_test(achorname,targeturl,title,USERNAME,PASSWORD)
 
 def huya_message(targeturl):
     req = requests.get(url = targeturl)
