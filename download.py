@@ -82,7 +82,7 @@ def popen(cmd,roomid,achorname,targeturl,platform):
                 flag_haved_d = True
                 flag_haved_upload = True
                 startTime = datetime.datetime.now().strftime('%Y-%m-%d-%H') + '时'
-                writeFile("startime.txt",startTime)
+                writeFile(achorname+"startime.txt",startTime)
                 if flag_getdanmu:
                     cmd1 = 'node ./huyadanmudouyu/huya.js '+roomid+' ./danmu '+achorname+"_"+"P"+str(time)
                     time = time + 1
@@ -104,7 +104,6 @@ def popen(cmd,roomid,achorname,targeturl,platform):
             if match3[0].strip() == '，重新尝试录制' and not flag_getdanmu:
                 print(achorname,' 停止danmu录制')
                 os.killpg(p1.pid,9)
-                os.killpg(p.pid,9)
                 flag_getdanmu = True
                 flag_startdanmu = True
         if len(match1)>0:
@@ -112,7 +111,6 @@ def popen(cmd,roomid,achorname,targeturl,platform):
                 time = 0
                 print(achorname,' 停止danmu录制')
                 os.killpg(p1.pid,9)
-                os.killpg(p.pid,9)
                 flag_getdanmu = False
                 flag_startdanmu = False
 
@@ -124,7 +122,6 @@ def popen(cmd,roomid,achorname,targeturl,platform):
                 elif platform == 'douyu':
                     description_names=douyu_des(targeturl)
                 writeFile(achorname+"endTitle.txt",description_names)
-                os.killpg(p.pid,9)
         
     p.stdout.close()
     p.wait()   
@@ -281,7 +278,7 @@ def job(targeturl,achorname,roomid,platform,description_names,timefilelist,USERN
     if(description_names==""):
         description_names = huya_des(targeturl)
     global title
-    title = achorname+'-'+readFile("startime.txt")+'-'+description_names
+    title = achorname+'-'+readFile(achorname+"startime.txt")+'-'+description_names
     #uploadbilibili(USERNAME,PASSWORD,timefilelist,platform,achorname,roomid)
     upload_test(achorname,targeturl,title,USERNAME,PASSWORD)
 def huya_message(targeturl):
@@ -333,7 +330,7 @@ def processs_task(targeturl,USERNAME,PASSWORD):
     p1 = threading.Thread()
     p2 = threading.Thread()
     while True:
-        cmd = 'java -Dfile.encoding=utf-8 -jar BiliLiveRecorder.jar '+'"'+'fileSize=512&fileName={startTime}-{endTime}&timeFormat=HH:mm&liver='+platform+'&qn=-1&id='+roomid+'"'
+        cmd = 'java -Dfile.encoding=utf-8 -jar BiliLiveRecorder.jar '+'"'+'retry=0&fileSize=10&fileName={name}-{startTime}-{endTime}&timeFormat=HH:mm&liver='+platform+'&qn=-1&id='+roomid+'"'
         try:
             popen(cmd,roomid,achorname,targeturl,platform)
         except Exception as err: 
