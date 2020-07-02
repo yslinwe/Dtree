@@ -1,5 +1,5 @@
-#-*- encodeing:utf-8 -*-
-import random,datetime
+# -*- coding: utf-8 -*-
+import random
 import unittest
 import os
 import shutil
@@ -18,7 +18,8 @@ import threading
 from queue import Queue
 from bypy import ByPy
 import signal
-from test_huya_danmu import get_danmu,stop_thread
+from upload import upload_test
+import datetime
 b = Bilibili()
 videolist = []
 new_videos = []
@@ -29,13 +30,30 @@ flag_have_start = True
 flag_haved_vd = True
 flag_haved_d = True 
 flag_haved_upload = True 
-
+numberOftime = 0
 #获取文件的大小,结果保留两位小数，单位为MB'''
 def get_FileSize(filePath):
     fsize = os.path.getsize(filePath)
     fsize = fsize/float(1024*1024)
     return round(fsize,2)
 
+def writeFile(fileName,starttime):
+    # 打开文件
+    fd = os.open(fileName,os.O_RDWR|os.O_CREAT)
+    # 写入字符串
+    global numberOftime
+    numberOftime = os.write(fd,starttime.encode())
+    os.close(fd)
+
+def readFile(fileName):
+    # 打开文件
+    fd = os.open(fileName,os.O_RDWR)
+        
+    # 读取文本
+    ret = os.read(fd,numberOftime)
+    # 关闭文件
+    os.close(fd)
+    return ret.decode('utf-8')
 def popen(cmd,roomid,achorname,targeturl,platform):
     time = 1
     flag_getdanmu = True
@@ -63,57 +81,50 @@ def popen(cmd,roomid,achorname,targeturl,platform):
                 flag_haved_vd = True
                 flag_haved_d = True
                 flag_haved_upload = True
+                startTime = datetime.datetime.now().strftime('%Y-%m-%d-%H') + '时'
+                writeFile("startime.txt",startTime)
                 if flag_getdanmu:
-                    '''
                     cmd1 = 'node ./huyadanmudouyu/huya.js '+roomid+' ./danmu '+achorname+"_"+"P"+str(time)
                     time = time + 1
                     p1 = subprocess.Popen(cmd1, shell =True,stdout=subprocess.PIPE, preexec_fn = os.setpgrp ,bufsize=1)
                     print(achorname,' danmu录制')
                     p1.stdout.close()
-                    '''
-                    times = str(datetime.datetime.now().strftime('%Y.%m.%d-%H.%M.%S'))
-                    filename = './danmu/'+times+"_"+roomid+"_"+achorname+"_"+"P"+str(time)+'.LRC'
-                    pthreads = threading.Thread(target=get_danmu,args=(roomid,filename))
-                    pthreads.start()
-                    
                     flag_getdanmu = False
                     flag_startdanmu = True
             else: 
                 time = 0
                 flag_upload = True
         if flag_getdanmu and flag_startdanmu:
-            #cmd1 = 'node ./huyadanmudouyu/huya.js '+roomid+' ./danmu '+achorname+"_"+"P"+str(time)
+            cmd1 = 'node ./huyadanmudouyu/huya.js '+roomid+' ./danmu '+achorname+"_"+"P"+str(time)
             time = time + 1
-            #p1 = subprocess.Popen(cmd1, shell =True,stdout=subprocess.PIPE, preexec_fn = os.setpgrp ,bufsize=1)
-            times = str(datetime.datetime.now().strftime('%Y.%m.%d-%H.%M.%S'))
-            filename = './danmu/'+times+"_"+roomid+"_"+achorname+"_"+"P"+str(time)+'.LRC'
-            pthreads = threading.Thread(target=get_danmu,args=(roomid,filename))
-            pthreads.start()
+            p1 = subprocess.Popen(cmd1, shell =True,stdout=subprocess.PIPE, preexec_fn = os.setpgrp ,bufsize=1)
             flag_startdanmu = False
             flag_getdanmu = False
         if len(match3)>0:
             if match3[0].strip() == '，重新尝试录制' and not flag_getdanmu:
                 print(achorname,' 停止danmu录制')
-                #os.killpg(p1.pid,9)
-                stop_thread(pthreads)
+                os.killpg(p1.pid,9)
+                os.killpg(p.pid,9)
                 flag_getdanmu = True
                 flag_startdanmu = True
         if len(match1)>0:
-            if match1[0].strip() == "下载停止" and not flag_getdanmu:
+            if match1[0].strip() == "下载停止" and not flag_getdanmu or match1[0].strip()=="SignalHandler is running":
                 time = 0
                 print(achorname,' 停止danmu录制')
-                #os.killpg(p1.pid,9)
-                stop_thread(pthreads)
+                os.killpg(p1.pid,9)
+                os.killpg(p.pid,9)
                 flag_getdanmu = False
                 flag_startdanmu = False
 
         if len(match1)>0:
-            if match1[0].strip() == "下载停止":
+            if match1[0].strip() == "下载停止" or match1[0].strip()=="SignalHandler is running":
                 global description_names
                 if platform=='huya':
                     description_names=huya_des(targeturl)
                 elif platform == 'douyu':
                     description_names=douyu_des(targeturl)
+                writeFile(achorname+"endTitle.txt",description_names)
+                os.killpg(p.pid,9)
         
     p.stdout.close()
     p.wait()   
@@ -126,7 +137,7 @@ def uploadby(filedir,filename,flag):
         if os.path.exists(filename):
             bp.upload(localpath= filename, remotepath= filedir, ondup='overwrite')
             os.remove(filename)
-    except:print('fail')
+    except:print('baidu up fail')
 def baiduupload(flielist,achor_name):
     print(flielist)
     _flag = True
@@ -159,7 +170,8 @@ def douyu_des(target):
 def cutvideo(achorname):
     path = os.getcwd()
     file_list = []
-    for f in os.listdir('./download'):
+    
+    for f in get_file_list(os.listdir('./download'),"download"):
         if f.endswith('flv') and f[0:len(achorname)] == achorname:
             file_list.append(f)
             fileofname=os.path.join('download',f)
@@ -201,6 +213,12 @@ def get_file_list(dir_list,file_path):
         dir_list = sorted(dir_list,  key=lambda x: os.path.getmtime(os.path.join(file_path, x)))
         # print(dir_list)
         return dir_list
+def new_get_file_list(dir_list,file_path):
+    if not dir_list:
+        return dir_list
+    else:
+        dir_list = sorted(dir_list,  key=lambda x: float(x[:-4].split("-")[-2]))
+        return dir_list
 def transformvideo(file):
     #cmd1 = 'ffmpeg -y -i '+'"'+real_url+'"'+' -filter_complex "[0:1]asetpts,aresample=async=1000" -acodec mp3 -vcodec copy -loglevel quiet '+'"'+output_file+'"'
     try:
@@ -215,7 +233,19 @@ def transformvideo(file):
         os.remove(file)
         os.rename(outfile,file)
     except:
-        pass
+        try:
+            outfile = file[:-4]+"temp"+".flv"
+            out,err = (
+            
+                ffmpeg 
+                .input(file) 
+                .output(outfile,filter_complex ="[1:0]asetpts,aresample=async=1000", acodec = "mp3",vcodec = "copy") 
+                .run(quiet = True,overwrite_output = True)
+            )
+            os.remove(file)
+            os.rename(outfile,file)
+        except:
+            pass
 def uploadbilibili(USERNAME,PASSWORD,videos,platform,achor_name,rid):
     try:
         b = Bilibili()
@@ -225,9 +255,9 @@ def uploadbilibili(USERNAME,PASSWORD,videos,platform,achor_name,rid):
                 if r:
                     print('Bilibili登陆成功')
                     break
-            except:
-                print('Bilibili登陆失败')
-                time.sleep(10)
+            except Exception as err:
+                print('Bilibili登陆失败',err)
+                time.sleep(60)
         print(videos)
         videolist = []
         for f in videos:
@@ -247,18 +277,13 @@ def uploadbilibili(USERNAME,PASSWORD,videos,platform,achor_name,rid):
 
 def job(targeturl,achorname,roomid,platform,description_names,timefilelist,USERNAME,PASSWORD):
     #timefilelist
-    for f in timefilelist:
-        if f.endswith('flv') and f[0:len(achorname)] == achorname:
-	        name = os.path.basename(f)
-	        MatchName = re.search(r"(\D.+)-(.+)\s(.+)\s(.+)\s(.+)-(.+)",name)
-	        if(description_names==""):
-	            description_names = huya_des(targeturl)
-	        global title
-	        title = achorname+'-'+MatchName.group(4).replace('-','.')+'.'+ MatchName.group(5).split('-')[0]+'-'+description_names
-	        break
-    print(title)
-    uploadbilibili(USERNAME,PASSWORD,timefilelist,platform,achorname,roomid)
-
+    description_names = readFile(achorname+"endTitle.txt")
+    if(description_names==""):
+        description_names = huya_des(targeturl)
+    global title
+    title = achorname+'-'+readFile("startime.txt")+'-'+description_names
+    #uploadbilibili(USERNAME,PASSWORD,timefilelist,platform,achorname,roomid)
+    upload_test(achorname,targeturl,title,USERNAME,PASSWORD)
 def huya_message(targeturl):
     req = requests.get(url = targeturl)
     html = req.text
@@ -290,6 +315,7 @@ def delete_video(achorname):
 def processs_task(targeturl,USERNAME,PASSWORD):
     vlq = Queue()
     danmu = Queue()
+    
     allfilelist = []
     allfilelist_two = []
     timefilelist = []
@@ -307,7 +333,7 @@ def processs_task(targeturl,USERNAME,PASSWORD):
     p1 = threading.Thread()
     p2 = threading.Thread()
     while True:
-        cmd = 'java -Dfile.encoding=utf-8 -jar BiliLiveRecorder.jar '+'"'+'debug=false&check=true&fileSize=512&liver='+platform+'&qn=0&retry=0&id='+roomid+'"'
+        cmd = 'java -Dfile.encoding=utf-8 -jar BiliLiveRecorder.jar '+'"'+'fileSize=512&fileName={startTime}-{endTime}&timeFormat=HH:mm&liver='+platform+'&qn=-1&id='+roomid+'"'
         try:
             popen(cmd,roomid,achorname,targeturl,platform)
         except Exception as err: 
@@ -344,7 +370,7 @@ def processs_task(targeturl,USERNAME,PASSWORD):
             videofile = [f for f in os.listdir('./') if f.endswith('flv') and f[0:len(achorname)] == achorname]
             flag_haved_upload = False
             if len(videofile)>0:
-                get_file_list(videofile,'./')
+                videofile = new_get_file_list(videofile,'./')
                 p2 = threading.Thread(target=job,args=(targeturl,achorname,roomid,platform,description_names,videofile,USERNAME,PASSWORD))
                 p2.start()
                 
